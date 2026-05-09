@@ -1,7 +1,8 @@
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
 import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
 import type { ProductConfig } from "./config.js";
 
 export type GeneratedSbom = {
@@ -41,7 +42,6 @@ async function generateSbomForProduct(
 ): Promise<GeneratedSbom> {
   const cwd = resolve(repoRoot, product.path);
 
-  // Use the cyclonedx-npm CLI as a subprocess. It writes JSON to stdout.
   const args = [
     "--package-lock-only",
     "--output-format=JSON",
@@ -50,10 +50,33 @@ async function generateSbomForProduct(
     "--mc-type=application",
   ];
 
-  const stdout = await runCommand("cyclonedx-npm", args, cwd);
+  const binPath = resolveCyclonedxBin();
+  const stdout = await runCommand(process.execPath, [binPath, ...args], cwd);
   const buf = Buffer.from(stdout);
   const sha = createHash("sha256").update(buf).digest("hex");
   return { bytes: new Uint8Array(buf), sha256: sha };
+}
+
+/**
+ * Resolve the cyclonedx-npm CLI script bundled with this package's own
+ * dependencies, so we don't depend on the host machine having
+ * `cyclonedx-npm` on PATH. The package's `exports` field doesn't expose
+ * `package.json`, so we resolve the main entry and derive the package root
+ * from it.
+ */
+function resolveCyclonedxBin(): string {
+  const req = createRequire(import.meta.url);
+  let mainPath: string;
+  try {
+    mainPath = req.resolve("@cyclonedx/cyclonedx-npm");
+  } catch {
+    throw new Error(
+      "cyclonedx-npm is not installed. Reinstall @cra-ready/cli or run with --file to upload an existing SBOM.",
+    );
+  }
+  // Main entry resolves to <pkg-root>/index.js (per its `exports` field).
+  const pkgDir = dirname(mainPath);
+  return resolve(pkgDir, "bin/cyclonedx-npm-cli.js");
 }
 
 function runCommand(cmd: string, args: string[], cwd: string): Promise<string> {
@@ -73,8 +96,7 @@ function runCommand(cmd: string, args: string[], cwd: string): Promise<string> {
       else
         rej(
           new Error(
-            `${cmd} exited with code ${code}.\n${err.trim() || "No stderr output."}\n` +
-              `Hint: cyclonedx-npm should be available via npx within @cra-ready/cli's deps.`,
+            `cyclonedx-npm exited with code ${code}.\n${err.trim() || "No stderr output."}`,
           ),
         );
     });

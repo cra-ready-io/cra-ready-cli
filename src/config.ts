@@ -47,12 +47,11 @@ export async function readConfig(path: string): Promise<CraReadyConfig> {
   }
 
   const products: ProductConfig[] = parsed.products.map((p, i) => {
-    if (!p.id) throw new Error(`products[${i}] is missing 'id'.`);
     if (!p.name) throw new Error(`products[${i}] is missing 'name'.`);
     if (!p.path) throw new Error(`products[${i}] is missing 'path'.`);
     if (!p.generator) throw new Error(`products[${i}] is missing 'generator'.`);
     return {
-      id: p.id,
+      id: p.id ?? "",
       name: p.name,
       path: p.path,
       generator: p.generator,

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { runInit } from "./commands/init.js";
+import { runLink } from "./commands/link.js";
+import { runProducts } from "./commands/products.js";
 import { runUpload } from "./commands/upload.js";
 import { c } from "./ui.js";
 
@@ -15,6 +17,12 @@ async function main(): Promise<void> {
     switch (command) {
       case "init":
         await runInit(rest);
+        break;
+      case "link":
+        await runLink(rest);
+        break;
+      case "products":
+        await runProducts(rest);
         break;
       case "upload":
         await runUpload(rest);
@@ -39,30 +47,37 @@ async function main(): Promise<void> {
 }
 
 function printVersion(): void {
-  // Inlined at build time would be ideal; for v1 we read from package.json
-  // sibling at runtime. Keep simple.
   console.log("0.1.0");
 }
 
 function printHelp(): void {
-  console.log(`${c.bold("cra-ready")} - Push SBOMs to CRA Ready
+  console.log(`${c.bold("cra-ready")} — push SBOMs to CRA Ready
 
 ${c.bold("Commands:")}
-  init                   Authorize this machine and link products to this repo
-  upload [--file FILE]   Generate and upload SBOMs for products in cra-ready.yml
-  --version              Print version
-  --help                 Show this message
+  init [--map=PATH:PRODUCT]...    Authorize this machine, detect packages, and write
+                                  cra-ready.yml. Auto-matches detected packages to
+                                  products by name; --map overrides per path.
 
-${c.bold("Options for upload:")}
-  --product NAME         Upload only the named product (default: all)
-  --file PATH            Use the given SBOM file instead of generating one (BYOSBOM)
-  --dry-run              Generate the SBOM but don't ship it
+  link --map=PATH:PRODUCT [...]   Add or update mappings without re-authorizing.
+                                  PRODUCT is an id, id-prefix, exact name, or slug.
+
+  products [--json|--ids-only]    List workspace products with their ids. Designed
+                                  for piping into scripts and AI agents.
+
+  upload [--product NAME]         Generate and upload SBOMs for products in
+         [--file PATH]            cra-ready.yml. --file uploads an existing SBOM
+         [--dry-run]              instead of generating. --only-on=ci-main skips
+         [--only-on=ci-main]      runs that aren't on the main branch in CI.
+
+  --version                       Print version
+  --help                          Show this message
 
 ${c.bold("Environment:")}
-  CRA_READY_TOKEN        Token for non-interactive uploads (CI). Required for upload
-                         when no token is cached locally.
-  CRA_READY_DISABLE      If set to a truthy value, all commands no-op with exit 0.
-                         Use this to kill the integration without code changes.
+  CRA_READY_TOKEN     Token for non-interactive use (CI). When set, init skips
+                      the browser flow entirely and won't cache locally.
+  CRA_READY_DISABLE   When truthy, all commands no-op with exit 0.
+  CRA_READY_HOST      Override the API host (default: https://app.cra-ready.io).
+  CRA_READY_MAIN_BRANCH   Branch name for --only-on=ci-main (default: main).
 
 ${c.dim("Source: https://github.com/cra-ready/cli")}`);
 }

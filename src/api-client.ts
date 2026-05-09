@@ -65,12 +65,7 @@ export class ApiClient {
 
   async pollCli(code: string): Promise<
     | { status: "pending" }
-    | {
-        status: "approved";
-        workspaceId: string;
-        tokenName: string;
-        scopedProductIds: string[];
-      }
+    | { status: "approved"; workspaceId: string; tokenName: string }
     | { status: "expired" }
     | { status: "consumed" }
   > {
@@ -82,19 +77,15 @@ export class ApiClient {
       return (await res.json()) as { status: "expired" } | { status: "consumed" };
     }
     if (!res.ok) throw await readError(res);
-    return (await res.json()) as { status: "pending" } | {
-      status: "approved";
-      workspaceId: string;
-      tokenName: string;
-      scopedProductIds: string[];
-    };
+    return (await res.json()) as
+      | { status: "pending" }
+      | { status: "approved"; workspaceId: string; tokenName: string };
   }
 
   async finalizeCli(code: string): Promise<{
     token: string;
     prefix: string;
     workspaceId: string;
-    scopedProductIds: string[];
     apiHost: string;
   }> {
     const res = await this.fetchImpl(`${this.apiHost}/api/v1/cli/finalize`, {
@@ -107,9 +98,19 @@ export class ApiClient {
       token: string;
       prefix: string;
       workspaceId: string;
-      scopedProductIds: string[];
       apiHost: string;
     };
+  }
+
+  async listProducts(): Promise<Array<{ id: string; name: string; version: string }>> {
+    const res = await this.fetchImpl(`${this.apiHost}/api/v1/products`, {
+      headers: this.headers(),
+    });
+    if (!res.ok) throw await readError(res);
+    const body = (await res.json()) as {
+      products: Array<{ id: string; name: string; version: string }>;
+    };
+    return body.products;
   }
 
   async createSbomIntent(input: {

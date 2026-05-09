@@ -1,4 +1,4 @@
-import { resolve, join } from "node:path";
+import { join } from "node:path";
 import { ApiClient } from "../api-client.js";
 import { deviceFlowAuthorize } from "../auth.js";
 import {
@@ -10,114 +10,191 @@ import {
   type CraReadyConfig,
   type ProductConfig,
 } from "../config.js";
-import { detectPackages, detectRepoRoot } from "../detect.js";
+import { detectPackages, detectRepoRoot, type DetectedPackage } from "../detect.js";
+import {
+  autoMatch,
+  parseMapFlags,
+  resolveProductRef,
+  type Product,
+} from "../lib/match.js";
 import { c, info, success, warn } from "../ui.js";
 
 const DEFAULT_API_HOST = process.env.CRA_READY_HOST ?? "https://app.cra-ready.io";
 
-export async function runInit(_args: string[]): Promise<void> {
+export async function runInit(rawArgs: string[]): Promise<void> {
   if (process.env.CRA_READY_DISABLE) {
     info("CRA_READY_DISABLE is set; skipping init.");
     return;
   }
+
+  const mapFlags = parseMapFlags(rawArgs);
 
   console.log(c.bold("\n  Welcome to CRA Ready.\n"));
 
   const repoRoot = await detectRepoRoot();
   info(`Repo root: ${repoRoot}`);
 
-  const detected = await detectPackages(repoRoot);
+  const detected = (await detectPackages(repoRoot)).filter((p) => p.kind === "node-app");
+  const packages: DetectedPackage[] =
+    detected.length > 0
+      ? detected
+      : [
+          {
+            path: ".",
+            name: repoRoot.split("/").pop() ?? "app",
+            kind: "node-app",
+            generator: "npm",
+          },
+        ];
+
   info(
     detected.length === 0
-      ? "No packages detected. Will treat the repo as a single product."
-      : `Detected ${detected.length} package${detected.length === 1 ? "" : "s"}.`,
+      ? "No deployable packages detected. Treating the repo as a single product."
+      : `Detected ${detected.length} deployable package${detected.length === 1 ? "" : "s"}: ${packages
+          .map((p) => p.path)
+          .join(", ")}.`,
   );
 
   const apiHost = DEFAULT_API_HOST;
-  const api = new ApiClient({ apiHost });
+  const { token, workspaceId, source } = await acquireToken(apiHost);
 
-  console.log(`\n  ${c.dim("Authorize this CLI in your browser…")}\n`);
-  const auth = await deviceFlowAuthorize(api);
+  const authedApi = new ApiClient({ apiHost, token });
 
-  // Persist auth for local (laptop) use; CI users will set CRA_READY_TOKEN env var.
-  await writeLocalAuth({
-    apiHost: auth.apiHost,
-    token: auth.token,
-    workspaceId: auth.workspaceId,
-  });
-  success("Saved auth to ~/.cra-ready/config.json (mode 0600).");
+  let products: Product[] = [];
+  try {
+    products = await authedApi.listProducts();
+  } catch (err) {
+    warn(`Could not fetch products: ${err instanceof Error ? err.message : String(err)}`);
+  }
 
-  // Map approved product IDs to detected paths.
-  const productConfigs = await mapApprovedProducts(auth.scopedProductIds, detected);
+  if (products.length === 0) {
+    warn(
+      "No products found in this workspace. Create at least one in your dashboard, then re-run cra-ready init or use cra-ready link.",
+    );
+  }
+
+  const mapped: ProductConfig[] = [];
+  const unmapped: DetectedPackage[] = [];
+  const summaryLines: string[] = [];
+
+  for (const pkg of packages) {
+    const explicit = mapFlags.find((m) => m.path === pkg.path);
+    if (explicit) {
+      const r = resolveProductRef(explicit.ref, products);
+      if (r.ok) {
+        mapped.push(toProductConfig(pkg, r.product));
+        summaryLines.push(
+          `  ✔ ${c.bold(pkg.path)} → ${r.product.name} v${r.product.version}  ${c.dim("(--map)")}`,
+        );
+        continue;
+      }
+      warn(
+        `--map=${pkg.path}:${explicit.ref} ${r.reason === "ambiguous" ? "matches multiple products" : "didn't match a product"}.`,
+      );
+    }
+
+    const auto = autoMatch(pkg.name, products);
+    if (auto) {
+      mapped.push(toProductConfig(pkg, auto));
+      summaryLines.push(
+        `  ✔ ${c.bold(pkg.path)} → ${auto.name} v${auto.version}  ${c.dim("(name match)")}`,
+      );
+      continue;
+    }
+
+    unmapped.push(pkg);
+    summaryLines.push(`  ⚠ ${c.bold(pkg.path)} → ${c.yellow("no match — id is empty in cra-ready.yml")}`);
+  }
+
+  const allEntries: ProductConfig[] = [
+    ...mapped,
+    ...unmapped.map((pkg): ProductConfig => ({
+      id: "",
+      name: pkg.name,
+      path: pkg.path,
+      generator: pkg.generator,
+    })),
+  ];
 
   const existingPath = await findConfigPath(repoRoot);
   const targetPath = existingPath ?? join(repoRoot, CONFIG_FILE_NAME);
-  const config: CraReadyConfig = await mergeOrCreateConfig(
-    existingPath,
-    apiHost,
-    productConfigs,
-  );
+  const config = await mergeOrCreateConfig(existingPath, apiHost, allEntries);
   await writeConfig(targetPath, config);
+
+  console.log("");
+  for (const line of summaryLines) console.log(line);
+  console.log("");
   success(`Wrote ${targetPath}`);
 
-  console.log("");
-  console.log(c.bold("  Token (save this in your CI secret store as CRA_READY_TOKEN):"));
-  console.log(`  ${c.cyan(auth.token)}`);
-  console.log("");
-  console.log(c.dim("  This token won't be shown again. It is also cached locally for"));
-  console.log(c.dim("  ad-hoc `cra-ready upload` runs from this machine."));
-  console.log("");
+  if (source === "device-flow") {
+    await writeLocalAuth({ apiHost, token, workspaceId });
+    console.log("");
+    console.log(c.bold("  Token (save this in your CI secret store as CRA_READY_TOKEN):"));
+    console.log(`  ${c.cyan(token)}`);
+    console.log(c.dim("  (also cached at ~/.cra-ready/config.json, mode 0600)"));
+  } else {
+    info("Token came from CRA_READY_TOKEN — not cached locally.");
+  }
 
-  const ghaSnippet = `- uses: actions/setup-node@v4
-  with: { node-version: 22 }
-- run: npx -y @cra-ready/cli@latest upload
-  env:
-    CRA_READY_TOKEN: \${{ secrets.CRA_READY_TOKEN }}`;
-
-  console.log(c.bold("  Add this step to your CI workflow (GitHub Actions example):"));
-  console.log(`  ${c.dim(ghaSnippet.split("\n").join("\n  "))}`);
-  console.log("");
-  success(
-    "Setup complete. Run `cra-ready upload` to do a first push, or merge to main and let CI run it.",
-  );
+  if (unmapped.length > 0) {
+    console.log("");
+    console.log(
+      c.yellow(
+        `  ${unmapped.length} package${unmapped.length === 1 ? "" : "s"} need${unmapped.length === 1 ? "s" : ""} a product id.`,
+      ),
+    );
+    console.log("");
+    if (products.length > 0) {
+      console.log(c.bold("  Available products:"));
+      for (const p of products) {
+        console.log(`    ${c.dim(p.id.slice(0, 8))}  ${p.name} ${c.dim(`v${p.version}`)}`);
+      }
+      console.log("");
+      console.log(c.bold("  To finish setup, either:"));
+      console.log(`    a) edit ${CONFIG_FILE_NAME} and paste a product id for each empty 'id' field`);
+      console.log(`    b) run:`);
+      for (const pkg of unmapped) {
+        console.log(c.dim(`         cra-ready link --map=${pkg.path}:<product-id-or-name>`));
+      }
+    } else {
+      console.log(c.bold("  Create a product in your dashboard, then run:"));
+      console.log(c.dim(`         cra-ready link --map=<path>:<product-id-or-name>`));
+    }
+  } else if (mapped.length > 0) {
+    console.log("");
+    success("Setup complete. Run `cra-ready upload` to push your first SBOM.");
+  }
 }
 
-async function mapApprovedProducts(
-  scopedProductIds: string[],
-  detected: { path: string; name: string; generator: string }[],
-): Promise<ProductConfig[]> {
-  // For v1, we don't have product names from the server (they were chosen in the
-  // browser). The CLI just records the IDs and a best-guess path. The user can
-  // later edit cra-ready.yml to refine paths.
-  if (scopedProductIds.length === 0) {
-    warn("No products were approved for this token.");
-    return [];
-  }
-
-  const apps = detected.filter((d) => !d.path.startsWith("packages/"));
-
-  if (scopedProductIds.length === 1) {
-    const path = apps[0]?.path ?? ".";
-    return [
-      {
-        id: scopedProductIds[0]!,
-        name: apps[0]?.name ?? "app",
-        path,
-        generator: (apps[0]?.generator ?? "npm") as ProductConfig["generator"],
-      },
-    ];
-  }
-
-  // Multiple products approved → pair best-effort with detected packages.
-  return scopedProductIds.map((id, i): ProductConfig => {
-    const match = apps[i] ?? apps[0];
+async function acquireToken(apiHost: string): Promise<{
+  token: string;
+  workspaceId: string;
+  source: "env" | "device-flow";
+}> {
+  if (process.env.CRA_READY_TOKEN) {
+    info("Using CRA_READY_TOKEN from environment (skipping browser auth).");
     return {
-      id,
-      name: match?.name ?? `product-${i + 1}`,
-      path: match?.path ?? ".",
-      generator: (match?.generator ?? "npm") as ProductConfig["generator"],
+      token: process.env.CRA_READY_TOKEN,
+      // Workspace will be inferred server-side from the token; we don't need
+      // it locally for cra-ready.yml. Use empty string as a placeholder.
+      workspaceId: "",
+      source: "env",
     };
-  });
+  }
+
+  console.log(`\n  ${c.dim("Authorize this CLI in your browser…")}\n`);
+  const api = new ApiClient({ apiHost });
+  const auth = await deviceFlowAuthorize(api);
+  return { token: auth.token, workspaceId: auth.workspaceId, source: "device-flow" };
+}
+
+function toProductConfig(pkg: DetectedPackage, product: Product): ProductConfig {
+  return {
+    id: product.id,
+    name: product.name,
+    path: pkg.path,
+    generator: pkg.generator,
+  };
 }
 
 async function mergeOrCreateConfig(
@@ -130,14 +207,10 @@ async function mergeOrCreateConfig(
   }
   try {
     const existing = await readConfig(existingPath);
-    const byId = new Map(existing.products.map((p) => [p.id, p]));
-    for (const p of newProducts) byId.set(p.id, p);
-    return { apiHost: existing.apiHost ?? apiHost, products: [...byId.values()] };
+    const byPath = new Map(existing.products.map((p) => [p.path, p]));
+    for (const p of newProducts) byPath.set(p.path, p);
+    return { apiHost: existing.apiHost ?? apiHost, products: [...byPath.values()] };
   } catch {
     return { apiHost, products: newProducts };
   }
 }
-
-// Re-export for tests
-export const __test = { mapApprovedProducts, mergeOrCreateConfig };
-export const __resolveRoot = resolve;

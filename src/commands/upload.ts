@@ -7,7 +7,6 @@ import {
   type CraReadyConfig,
   type ProductConfig,
 } from "../config.js";
-import { detectRepoRoot } from "../detect.js";
 import { generateOrLoadSbom } from "../sbom-generator.js";
 import { c, info, success, warn, fail } from "../ui.js";
 
@@ -53,6 +52,15 @@ export async function runUpload(rawArgs: string[]): Promise<void> {
   if (products.length === 0) {
     warn(`No products to upload${args.product ? ` matching "${args.product}"` : ""}.`);
     return;
+  }
+
+  const unmapped = products.filter((p) => !p.id);
+  if (unmapped.length > 0) {
+    fail(
+      `Some products in cra-ready.yml don't have an 'id' set: ${unmapped.map((p) => p.name).join(", ")}. ` +
+        `Find IDs in your dashboard at ${config.apiHost}/app/products and paste them in.`,
+    );
+    process.exit(1);
   }
 
   let uploaded = 0;

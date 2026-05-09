@@ -9,7 +9,6 @@ export type CliAuthorization = {
   token: string;
   prefix: string;
   workspaceId: string;
-  scopedProductIds: string[];
   apiHost: string;
 };
 
@@ -51,7 +50,6 @@ export async function deviceFlowAuthorize(api: ApiClient): Promise<CliAuthorizat
         token: result.token,
         prefix: result.prefix,
         workspaceId: result.workspaceId,
-        scopedProductIds: result.scopedProductIds,
         apiHost: result.apiHost,
       };
     }
