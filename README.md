@@ -83,12 +83,12 @@ Single-package repos: `products` has length 1 with `path: "."`. Same shape, no s
 
 ## Environment variables
 
-| Variable | Purpose |
-| --- | --- |
-| `CRA_READY_TOKEN` | Token for non-interactive uploads. Required in CI. |
-| `CRA_READY_DISABLE` | If set, all commands no-op. Use to kill the integration without code changes. |
-| `CRA_READY_HOST` | Override the API host (default: `https://app.cra-ready.io`). |
-| `CRA_READY_MAIN_BRANCH` | Branch name for `--only-on=ci-main` (default: `main`). |
+| Variable                | Purpose                                                                       |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| `CRA_READY_TOKEN`       | Token for non-interactive uploads. Required in CI.                            |
+| `CRA_READY_DISABLE`     | If set, all commands no-op. Use to kill the integration without code changes. |
+| `CRA_READY_HOST`        | Override the API host (default: `https://app.cra-ready.io`).                  |
+| `CRA_READY_MAIN_BRANCH` | Branch name for `--only-on=ci-main` (default: `main`).                        |
 
 ## Source
 

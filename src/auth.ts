@@ -28,10 +28,7 @@ export async function deviceFlowAuthorize(api: ApiClient): Promise<CliAuthorizat
     info("Couldn't auto-open browser. Please open the URL above manually.");
   }
 
-  const deadline = Math.min(
-    Date.now() + MAX_WAIT_MS,
-    new Date(expiresAt).getTime(),
-  );
+  const deadline = Math.min(Date.now() + MAX_WAIT_MS, new Date(expiresAt).getTime());
 
   while (Date.now() < deadline) {
     await sleep(POLL_INTERVAL_MS);

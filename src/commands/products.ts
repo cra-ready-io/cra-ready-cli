@@ -4,14 +4,19 @@ import { c, fail, info } from "../ui.js";
 
 const DEFAULT_API_HOST = process.env.CRA_READY_HOST ?? "https://app.cra-ready.io";
 
-export async function runProducts(rawArgs: string[]): Promise<void> {
+export type ProductsOptions = {
+  json?: boolean;
+  idsOnly?: boolean;
+};
+
+export async function runProducts(opts: ProductsOptions = {}): Promise<void> {
   if (process.env.CRA_READY_DISABLE) {
     info("CRA_READY_DISABLE is set; skipping products.");
     return;
   }
 
-  const json = rawArgs.includes("--json");
-  const idsOnly = rawArgs.includes("--ids-only");
+  const json = opts.json === true;
+  const idsOnly = opts.idsOnly === true;
 
   const apiHost = await resolveApiHost();
   const token = await resolveToken();

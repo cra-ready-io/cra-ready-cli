@@ -24,8 +24,7 @@ async function readError(res: Response): Promise<ApiError> {
   } catch {
     // ignore
   }
-  const code =
-    body.type?.split("/").pop() ?? body.title ?? `http_${res.status}`;
+  const code = body.type?.split("/").pop() ?? body.title ?? `http_${res.status}`;
   const detail = body.detail ?? body.title ?? `HTTP ${res.status}`;
   return new ApiError(res.status, code, detail);
 }
@@ -63,7 +62,9 @@ export class ApiClient {
     return (await res.json()) as { code: string; verificationUrl: string; expiresAt: string };
   }
 
-  async pollCli(code: string): Promise<
+  async pollCli(
+    code: string,
+  ): Promise<
     | { status: "pending" }
     | { status: "approved"; workspaceId: string; tokenName: string }
     | { status: "expired" }
@@ -163,14 +164,11 @@ export class ApiClient {
     productId: string;
     dashboardUrl: string;
   }> {
-    const res = await this.fetchImpl(
-      `${this.apiHost}/api/v1/sboms/${artifactId}/finalize`,
-      {
-        method: "POST",
-        headers: this.headers(),
-        body: JSON.stringify({ sha256 }),
-      },
-    );
+    const res = await this.fetchImpl(`${this.apiHost}/api/v1/sboms/${artifactId}/finalize`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify({ sha256 }),
+    });
     if (!res.ok) throw await readError(res);
     return (await res.json()) as {
       artifactId: string;

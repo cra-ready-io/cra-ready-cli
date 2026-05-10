@@ -10,7 +10,9 @@ function jsonResponse(status: number, body: unknown): Response {
 
 describe("ApiClient", () => {
   it("attaches Bearer token when provided", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(201, { code: "X", verificationUrl: "u", expiresAt: "z" }));
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(201, { code: "X", verificationUrl: "u", expiresAt: "z" }));
     const api = new ApiClient({ apiHost: "https://app.x", token: "crar_live_t", fetch: fetchSpy });
     await api.startCli();
     const init = fetchSpy.mock.calls[0]![1];
@@ -27,15 +29,15 @@ describe("ApiClient", () => {
       }),
     );
     const api = new ApiClient({ apiHost: "https://app.x", token: "x", fetch: fetchSpy });
-    await expect(api.createSbomIntent({ productId: "p", sizeBytes: 1, sha256: "s" })).rejects.toBeInstanceOf(
-      ApiError,
-    );
+    await expect(
+      api.createSbomIntent({ productId: "p", sizeBytes: 1, sha256: "s" }),
+    ).rejects.toBeInstanceOf(ApiError);
   });
 
   it("returns deduplicated intent without an upload URL", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue(
-      jsonResponse(200, { artifactId: "a1", status: "deduplicated" }),
-    );
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(200, { artifactId: "a1", status: "deduplicated" }));
     const api = new ApiClient({ apiHost: "https://app.x", token: "t", fetch: fetchSpy });
     const result = await api.createSbomIntent({ productId: "p", sizeBytes: 1, sha256: "s" });
     expect(result).toEqual({ artifactId: "a1", status: "deduplicated" });

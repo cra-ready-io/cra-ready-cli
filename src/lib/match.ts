@@ -38,9 +38,7 @@ export function resolveProductRef(
   // 1. UUID-like → match by id
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
     const byId = products.find((p) => p.id.toLowerCase() === trimmed.toLowerCase());
-    return byId
-      ? { ok: true, product: byId }
-      : { ok: false, reason: "not_found" };
+    return byId ? { ok: true, product: byId } : { ok: false, reason: "not_found" };
   }
 
   // 2. Prefix of an id (we show truncated IDs in CLI output, so users may copy a prefix)
@@ -69,18 +67,13 @@ export function resolveProductRef(
 export type MapFlag = { path: string; ref: string };
 
 /**
- * Parse repeatable `--map=PATH:REF` flags into structured form. Accepts both
- * `--map=path:ref` and `--map path:ref`. Splits on the first `:` so refs can
- * contain colons (rare, but possible in product names).
+ * Parse repeatable `--map PATH:REF` values (already split by the CLI parser)
+ * into structured form. Splits on the first `:` so refs can contain colons
+ * (rare, but possible in product names).
  */
-export function parseMapFlags(rawArgs: string[]): MapFlag[] {
+export function parseMapValues(values: readonly string[]): MapFlag[] {
   const out: MapFlag[] = [];
-  for (let i = 0; i < rawArgs.length; i++) {
-    const a = rawArgs[i]!;
-    let value: string | undefined;
-    if (a === "--map") value = rawArgs[++i];
-    else if (a.startsWith("--map=")) value = a.slice("--map=".length);
-    if (value === undefined) continue;
+  for (const value of values) {
     const idx = value.indexOf(":");
     if (idx === -1) {
       throw new Error(`--map expects PATH:REF, got: ${value}`);

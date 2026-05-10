@@ -11,23 +11,22 @@ import {
   type ProductConfig,
 } from "../config.js";
 import { detectPackages, detectRepoRoot, type DetectedPackage } from "../detect.js";
-import {
-  autoMatch,
-  parseMapFlags,
-  resolveProductRef,
-  type Product,
-} from "../lib/match.js";
+import { autoMatch, parseMapValues, resolveProductRef, type Product } from "../lib/match.js";
 import { c, info, success, warn } from "../ui.js";
 
 const DEFAULT_API_HOST = process.env.CRA_READY_HOST ?? "https://app.cra-ready.io";
 
-export async function runInit(rawArgs: string[]): Promise<void> {
+export type InitOptions = {
+  map?: string[];
+};
+
+export async function runInit(opts: InitOptions = {}): Promise<void> {
   if (process.env.CRA_READY_DISABLE) {
     info("CRA_READY_DISABLE is set; skipping init.");
     return;
   }
 
-  const mapFlags = parseMapFlags(rawArgs);
+  const mapFlags = parseMapValues(opts.map ?? []);
 
   console.log(c.bold("\n  Welcome to CRA Ready.\n"));
 
@@ -103,17 +102,21 @@ export async function runInit(rawArgs: string[]): Promise<void> {
     }
 
     unmapped.push(pkg);
-    summaryLines.push(`  ⚠ ${c.bold(pkg.path)} → ${c.yellow("no match — id is empty in cra-ready.yml")}`);
+    summaryLines.push(
+      `  ⚠ ${c.bold(pkg.path)} → ${c.yellow("no match — id is empty in cra-ready.yml")}`,
+    );
   }
 
   const allEntries: ProductConfig[] = [
     ...mapped,
-    ...unmapped.map((pkg): ProductConfig => ({
-      id: "",
-      name: pkg.name,
-      path: pkg.path,
-      generator: pkg.generator,
-    })),
+    ...unmapped.map(
+      (pkg): ProductConfig => ({
+        id: "",
+        name: pkg.name,
+        path: pkg.path,
+        generator: pkg.generator,
+      }),
+    ),
   ];
 
   const existingPath = await findConfigPath(repoRoot);
@@ -151,7 +154,9 @@ export async function runInit(rawArgs: string[]): Promise<void> {
       }
       console.log("");
       console.log(c.bold("  To finish setup, either:"));
-      console.log(`    a) edit ${CONFIG_FILE_NAME} and paste a product id for each empty 'id' field`);
+      console.log(
+        `    a) edit ${CONFIG_FILE_NAME} and paste a product id for each empty 'id' field`,
+      );
       console.log(`    b) run:`);
       for (const pkg of unmapped) {
         console.log(c.dim(`         cra-ready link --map=${pkg.path}:<product-id-or-name>`));
