@@ -64,7 +64,7 @@ GitHub Actions for releases:
   "Version Packages" PR that bumps the version in `package.json` and
   regenerates `CHANGELOG.md`.
 - Merging that PR triggers the publish step, which pushes the new version to
-  npm (with [provenance attestations](https://docs.npmjs.com/generating-provenance-statements)) and creates a Git tag.
+  npm (with [provenance attestations](https://docs.npmjs.com/generating-provenance-statements)) and creates a Git tag. Authentication to npm is handled by [Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC) — there is no long-lived `NPM_TOKEN` secret stored in the repo.
 
 You don't need to bump versions or edit the changelog by hand — Changesets
 owns both.
