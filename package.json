@@ -1,6 +1,6 @@
 {
   "name": "@cra-ready/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Push SBOMs to CRA Ready from your terminal or CI.",
   "license": "MIT",
   "author": "CRA Ready",
