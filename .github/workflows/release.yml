@@ -22,18 +22,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Use Node.js 22
+      # Node 24 ships with npm 11.x, which is the minimum for npm Trusted
+      # Publishing (OIDC). The CI matrix still tests on Node 20/22; this is
+      # release-only.
+      - name: Use Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version: 24.x
           cache: npm
           registry-url: "https://registry.npmjs.org"
-
-      # npm Trusted Publishing requires npm CLI 11.5.1+. Node 22 ships with
-      # npm 10.x, so upgrade explicitly. Provenance is implicit when publishing
-      # via OIDC, but we keep NPM_CONFIG_PROVENANCE for clarity.
-      - name: Upgrade npm to a Trusted-Publishing-capable version
-        run: npm install --global npm@latest
 
       - run: npm ci
 
