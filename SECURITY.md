@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 If you discover a security issue in `@cra-ready/cli`, please report it
-**privately** via GitHub's [Security Advisories](https://github.com/cra-ready/cli/security/advisories/new)
+**privately** via GitHub's [Security Advisories](https://github.com/cra-ready-io/cra-ready-cli/security/advisories/new)
 form rather than opening a public issue.
 
 We aim to acknowledge reports within **3 business days** and to ship a fix or

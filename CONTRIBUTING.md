@@ -13,7 +13,7 @@ mechanics: setup, scripts, conventions, and how releases work.
 ## Setup
 
 ```sh
-git clone https://github.com/cra-ready/cli.git
+git clone https://github.com/cra-ready-io/cra-ready-cli.git
 cd cli
 npm install
 ```
@@ -83,6 +83,6 @@ We use Vitest. Tests are colocated with source as `*.test.ts`. Patterns we follo
 ## Reporting bugs / requesting features
 
 Open an issue using one of the templates at
-<https://github.com/cra-ready/cli/issues/new/choose>. Security issues should
+<https://github.com/cra-ready-io/cra-ready-cli/issues/new/choose>. Security issues should
 follow the process in [`SECURITY.md`](SECURITY.md) instead of being filed
 publicly.

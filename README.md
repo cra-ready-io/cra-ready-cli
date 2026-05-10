@@ -92,7 +92,7 @@ Single-package repos: `products` has length 1 with `path: "."`. Same shape, no s
 
 ## Source
 
-This CLI is open source by design. Read it before installing it: <https://github.com/cra-ready/cli>.
+This CLI is open source by design. Read it before installing it: <https://github.com/cra-ready-io/cra-ready-cli>.
 
 ## License
 
