@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { autoMatch, parseMapFlags, resolveProductRef, slugify } from "./match.js";
+import { autoMatch, parseMapValues, resolveProductRef, slugify } from "./match.js";
 
 const products = [
   { id: "f3a2cd00-0000-0000-0000-000000000001", name: "Payments API", version: "2.0" },
@@ -78,37 +78,34 @@ describe("resolveProductRef", () => {
   });
 });
 
-describe("parseMapFlags", () => {
-  it("parses --map=path:ref", () => {
-    expect(parseMapFlags(["--map=apps/payments:Payments API"])).toEqual([
+describe("parseMapValues", () => {
+  it("parses a single PATH:REF value", () => {
+    expect(parseMapValues(["apps/payments:Payments API"])).toEqual([
       { path: "apps/payments", ref: "Payments API" },
     ]);
   });
 
-  it("parses --map path ref split form", () => {
-    expect(parseMapFlags(["--map", "apps/checkout:checkout-web"])).toEqual([
-      { path: "apps/checkout", ref: "checkout-web" },
-    ]);
-  });
-
-  it("supports repeated --map flags", () => {
-    const flags = parseMapFlags([
-      "--map=a:1",
-      "--map=b:2",
-      "--unrelated",
-      "--map",
-      "c:3",
-    ]);
-    expect(flags).toEqual([
+  it("parses multiple values", () => {
+    expect(parseMapValues(["a:1", "b:2", "c:3"])).toEqual([
       { path: "a", ref: "1" },
       { path: "b", ref: "2" },
       { path: "c", ref: "3" },
     ]);
   });
 
+  it("only splits on the first colon (refs may contain colons)", () => {
+    expect(parseMapValues(["apps/svc:Org:Product"])).toEqual([
+      { path: "apps/svc", ref: "Org:Product" },
+    ]);
+  });
+
+  it("returns empty array on empty input", () => {
+    expect(parseMapValues([])).toEqual([]);
+  });
+
   it("throws on malformed values", () => {
-    expect(() => parseMapFlags(["--map=no-colon"])).toThrow();
-    expect(() => parseMapFlags(["--map=:missing-path"])).toThrow();
-    expect(() => parseMapFlags(["--map=missing-ref:"])).toThrow();
+    expect(() => parseMapValues(["no-colon"])).toThrow();
+    expect(() => parseMapValues([":missing-path"])).toThrow();
+    expect(() => parseMapValues(["missing-ref:"])).toThrow();
   });
 });

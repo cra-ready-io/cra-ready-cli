@@ -53,10 +53,7 @@ export async function detectPackages(repoRoot: string): Promise<DetectedPackage[
   ];
 }
 
-async function detectPnpmWorkspace(
-  repoRoot: string,
-  yamlPath: string,
-): Promise<DetectedPackage[]> {
+async function detectPnpmWorkspace(repoRoot: string, yamlPath: string): Promise<DetectedPackage[]> {
   const text = await readFile(yamlPath, "utf8");
   const parsed = parseYaml(text) as { packages?: string[] } | null;
   const globs = parsed?.packages ?? [];
@@ -75,10 +72,9 @@ async function expandGlobs(
     if (pattern.startsWith("!")) continue;
     const cleaned = pattern.endsWith("/*") ? pattern : `${pattern.replace(/\/?$/, "")}/*`;
     try {
-      for await (const match of (glob as unknown as (
-        p: string,
-        opts: { cwd: string },
-      ) => AsyncIterable<string>)(cleaned, { cwd: repoRoot })) {
+      for await (const match of (
+        glob as unknown as (p: string, opts: { cwd: string }) => AsyncIterable<string>
+      )(cleaned, { cwd: repoRoot })) {
         const abs = resolve(repoRoot, match);
         const pkgPath = join(abs, "package.json");
         if (!existsSync(pkgPath)) continue;

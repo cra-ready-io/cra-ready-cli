@@ -8,22 +8,26 @@ import {
   type ProductConfig,
 } from "../config.js";
 import { detectPackages } from "../detect.js";
-import { parseMapFlags, resolveProductRef } from "../lib/match.js";
+import { parseMapValues, resolveProductRef } from "../lib/match.js";
 import { c, fail, info, success, warn } from "../ui.js";
 
-export async function runLink(rawArgs: string[]): Promise<void> {
+export type LinkOptions = {
+  map: string[];
+};
+
+export async function runLink(opts: LinkOptions): Promise<void> {
   if (process.env.CRA_READY_DISABLE) {
     info("CRA_READY_DISABLE is set; skipping link.");
     return;
   }
 
-  const flags = parseMapFlags(rawArgs);
+  const flags = parseMapValues(opts.map ?? []);
   if (flags.length === 0) {
     fail(
-      "cra-ready link expects at least one --map=PATH:PRODUCT flag.\n" +
+      "cra-ready link expects at least one --map PATH:PRODUCT flag.\n" +
         "  Examples:\n" +
-        "    cra-ready link --map=apps/payments:Payments-API\n" +
-        "    cra-ready link --map=services/billing:8e0f-1bca-…",
+        "    cra-ready link --map apps/payments:Payments-API\n" +
+        "    cra-ready link --map services/billing:8e0f-1bca-…",
     );
     process.exit(2);
   }
@@ -57,7 +61,9 @@ export async function runLink(rawArgs: string[]): Promise<void> {
   for (const flag of flags) {
     const r = resolveProductRef(flag.ref, products);
     if (!r.ok) {
-      fail(`--map=${flag.path}:${flag.ref} ${r.reason === "ambiguous" ? "matches multiple products" : "didn't match a product"}.`);
+      fail(
+        `--map=${flag.path}:${flag.ref} ${r.reason === "ambiguous" ? "matches multiple products" : "didn't match a product"}.`,
+      );
       process.exit(1);
     }
     const existing = byPath.get(flag.path);

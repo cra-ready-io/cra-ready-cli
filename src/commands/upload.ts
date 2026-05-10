@@ -10,6 +10,13 @@ import {
 import { generateOrLoadSbom } from "../sbom-generator.js";
 import { c, info, success, warn, fail } from "../ui.js";
 
+export type UploadOptions = {
+  product?: string;
+  file?: string;
+  dryRun?: boolean;
+  onlyOn?: string;
+};
+
 type Args = {
   product?: string;
   file?: string;
@@ -17,13 +24,18 @@ type Args = {
   onlyOnCiMain: boolean;
 };
 
-export async function runUpload(rawArgs: string[]): Promise<void> {
+export async function runUpload(opts: UploadOptions = {}): Promise<void> {
   if (process.env.CRA_READY_DISABLE) {
     info("CRA_READY_DISABLE is set; skipping upload.");
     return;
   }
 
-  const args = parseArgs(rawArgs);
+  const args: Args = {
+    product: opts.product,
+    file: opts.file,
+    dryRun: opts.dryRun === true,
+    onlyOnCiMain: opts.onlyOn === "ci-main",
+  };
 
   if (args.onlyOnCiMain && !shouldRunOnCiMain()) {
     info("Skipping upload (not a main-branch CI run).");
@@ -106,9 +118,7 @@ async function uploadOne({
   const sbom = await generateOrLoadSbom(product, repoRoot, args.file);
 
   if (args.dryRun) {
-    info(
-      `dry-run: ${sbom.bytes.byteLength} bytes, sha256=${sbom.sha256.slice(0, 12)}…`,
-    );
+    info(`dry-run: ${sbom.bytes.byteLength} bytes, sha256=${sbom.sha256.slice(0, 12)}…`);
     return "uploaded";
   }
 
@@ -132,9 +142,7 @@ async function uploadOne({
   await api.uploadBytes(intent.upload.url, sbom.bytes);
 
   const final = await api.finalizeSbom(intent.artifactId, sbom.sha256);
-  success(
-    `${product.name}: ${final.components} components → ${c.cyan(final.dashboardUrl)}`,
-  );
+  success(`${product.name}: ${final.components} components → ${c.cyan(final.dashboardUrl)}`);
   return "uploaded";
 }
 
@@ -147,20 +155,6 @@ async function resolveToken(_config: CraReadyConfig): Promise<string | null> {
 function filterProducts(config: CraReadyConfig, filter?: string): ProductConfig[] {
   if (!filter) return config.products;
   return config.products.filter((p) => p.id === filter || p.name === filter);
-}
-
-function parseArgs(rawArgs: string[]): Args {
-  const args: Args = { dryRun: false, onlyOnCiMain: false };
-  for (let i = 0; i < rawArgs.length; i++) {
-    const a = rawArgs[i]!;
-    if (a === "--product") args.product = rawArgs[++i];
-    else if (a.startsWith("--product=")) args.product = a.slice("--product=".length);
-    else if (a === "--file") args.file = rawArgs[++i];
-    else if (a.startsWith("--file=")) args.file = a.slice("--file=".length);
-    else if (a === "--dry-run") args.dryRun = true;
-    else if (a === "--only-on=ci-main") args.onlyOnCiMain = true;
-  }
-  return args;
 }
 
 function detectCiName(): string | undefined {

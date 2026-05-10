@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write # required for npm Trusted Publishing (OIDC) + provenance
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+
+      # npm Trusted Publishing requires npm CLI 11.5.1+. Node 22 ships with
+      # npm 10.x, so upgrade explicitly. Provenance is implicit when publishing
+      # via OIDC, but we keep NPM_CONFIG_PROVENANCE for clarity.
+      - name: Upgrade npm to a Trusted-Publishing-capable version
+        run: npm install --global npm@latest
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Create release PR or publish to npm
+        uses: changesets/action@v1
+        with:
+          publish: npm run release
+          version: npx changeset version
+          commit: "chore: release"
+          title: "chore: release"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"
